@@ -1,0 +1,224 @@
+Python Gotchas for Perl Programmers, by Quinn Weaver: SF.pm lightning 2014-05-06
+================================================================================
+
+This talk covers Python 2.7.6 and Perl 5.18.2.
+
+Starting from Perl and learning Python? Be aware of these gotchas.
+
+1. Python typing is dynamic, yet also strong.
+
+a. int doesn't get silently coerced to string (or vice versa);
+   instead, you get a runtime exception.
+
+   Perl code:
+
+       my $fake_obj = { i => 10 };
+       print "i is " .  $fake_obj->{i} . ".\n";
+
+   Perl result:
+
+       i is 10.
+
+   Python code (contrived):
+   
+       import sys
+
+       i = 10
+       sys.stdout.write("i = " + i + ".\n")
+       sys.stdout.flush()
+
+       Traceback (most recent call last):
+         File "./py-int-to-string.py", line 6, in <module>
+           sys.stdout.write("i = " + i + ".\n")
+       TypeError: cannot concatenate 'str' and 'int' objects
+
+   Ditto with string-to-int.
+
+   So you have to call str() explicitly in many places; the + operator and
+   various write functions don't automatically do it for you.
+
+   Python code (working; still contrived):
+
+       import sys
+
+       i = 10
+       sys.stderr.write("i = " + str(i) + ".\n")
+       sys.stderr.flush()
+
+   Output (corrected now):
+
+       i = 10.
+
+2. Python constructors are like Perl constructors, except you don't return
+   self (it happens implicitly).
+
+   Perl (the blessed-hash way, not Moose):
+
+       sub new { # the name 'new' is not magic
+           my ($self, $a) = @_;
+           $self->{a} = $a;
+           return $self;
+       }
+
+   Python:
+
+       def __init__(self, a): # the name '__init__' is magic
+           self.a = a
+
+3. Arg-processing is different. Not as flexible, but not as manual,
+   either (by the same token). **kwargs have to go at the end if you have
+   an arbitrary number of *args.
+
+   Python:
+
+       def my_function(socket, protocol='http', *args, **kwargs):
+          ...        # ^     # ^ default value
+                     # |
+                     # - presence of argument is checked automatically by Python
+   Perl:
+
+       sub my_function {
+           my ($socket, $protocol, 
+           $protocol //= 'http';
+           ...
+       }
+
+4. Python lists and tuples don't get flattened when you pass them to
+a function; they get passed by reference.
+
+   Perl:
+ 
+       sub say_three {
+           my ($a, $b, $c) = @_;
+           say $a;
+           say $b;
+           say $c;
+       }
+       
+       my @seq = ('a', 'b', 'c');
+       say_three(@seq);
+
+   Perl output:
+
+       a
+       b
+       c
+
+   Python (naive):
+
+       def say_three(a, b, c):
+           print a
+           print b
+           print c
+
+       seq = ('a', 'b', 'c')
+       say_three(seq)
+
+   Python output:
+
+       Traceback (most recent call last):
+         File "./say.py", line 9, in <module>
+           say_three(list)
+       TypeError: say_three() takes exactly 3 arguments (1 given)
+
+   To get this right in Python, one mnemonic is to use lists
+   instead of tuples where possible (which is almost everywhere):
+
+       seq = ['a', 'b', 'c']
+       say_three(seq)
+
+   ... because lists use square bracket notation, which looks like a Perl
+   arrayref, which is passed by reference without flattening,
+   just like Python lists and tuples. So you're more likely to think of
+   it as pass-by-reference if you're a Perl programmer.
+
+   Python (correct, with mnemonic):
+
+        def say_three(sequence):
+            print sequence[0]
+            print sequence[1]
+            print sequence[2]
+
+        seq = ['a', 'b', 'c']
+        say_three(seq)
+
+   There's usually no harm in using lists instead of tuples,
+   though there is a tiny performance penalty. I say go for it.
+
+
+
+    This suggests a mnemonic. It's easier to remember Python's
+    pass-by-reference semantics if you use square brackets (i.e., lists),
+    because then they look more like Perl listrefs. 
+
+5. The converse is not true, however. There often *is* harm in using a
+tuple instead of a list. That's because tuples are immutable; you
+can't append to them, for instance. But they look confusingly similar.
+Again:
+
+    [1, 2, 3] # list (mutable)
+    
+    (1, 2, 3) # tuple (immutable)
+
+Because the latter is the way that lists are commonly represented in Perl,
+I sometimes find myself typing Python lists that way. Then I get errors
+when I try to append or whatever.
+
+To complicate matters, Python is just loosely enough typed that you can
+pass in a tuple to a method that expects a list, and you won't
+get an exception till some other code tries to mutate the tuple, maybe
+a long way down the road (and at runtime, of course).
+
+This is a second good argument for just using [lists] everywhere.
+
+6. In Python, join() is a method on the string class, not the list class.
+This is counterintuitive to most programmers. After all, the list is
+the thing you're joining, right? Why isn't the "verb" on the list "noun?"
+
+   Python (naive):
+
+       seq = ['a', 'b', 'c']
+       print seq.join("\n")
+
+   Output:
+
+       Traceback (most recent call last):                   
+         File "./join.py", line 4, in <module>              
+           print seq.join("\n")                             
+       AttributeError: 'list' object has no attribute 'join'
+
+   Python (correct):
+
+       seq = ['a', 'b', 'c']
+       print "\n".join(seq)
+
+   Output:
+
+       a
+       b
+       c
+
+   A mnemonic for this is that the order of "nouns" in the correct Python
+   is the same as in the correct Perl:
+
+   print "\n".join(seq) # Python
+   say join "\n", @seq; # Perl
+
+   Here, "\n" is the first noun, and seq is the second noun.
+
+7. Portability: Perl provides its own implementation of certain Unix
+system calls. Python doesn't do this; its 'os' standard library
+makes direct system calls instead.
+
+This means that any time you want to make a direct system call like
+os.tmpnam() or os.urandom, you have to consider the same kind of
+portability gotchas as you would when writing C.
+
+License for This File
+---------------------
+
+Copyright (C) Quinn Weaver, 2014.
+
+This work is licensed under the Creative Commons
+Attribution-NoDerivatives 4.0 International License. To view a copy of
+this license, visit http://creativecommons.org/licenses/by-nd/4.0/.
