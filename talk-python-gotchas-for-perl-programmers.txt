@@ -83,7 +83,39 @@ a. int doesn't get silently coerced to string (or vice versa);
            ...
        }
 
-4. Python lists and tuples don't get flattened when you pass them to
+4. Default arguments in Python may not work as you expect
+   (thanks to Martin Chikilian for this one, written up for Python at http://www.toptal.com/python/top-10-mistakes-that-python-programmers-make?utm_source=Engineering+Blog+Subscribers&utm_campaign=51aba2b5ff-Blog_Post_Email_Top10PythonMistakes&utm_medium=email&utm_term=0_af8c2cde60-51aba2b5ff-109835873)
+
+   Python:
+
+       def append_one(list=[]):
+           list.append(1)
+           return list
+
+       print append_one() # prints [1]
+       print append_one() # you expect [1], but it prints [1, 1]
+
+   What's going on here? You're not getting a new list [] on every call;
+   you're getting a reference to the original list. So it keeps growing.
+
+   Think of "list" as a static variable (C) or, more Perlishly,
+   as a variable captured by a closure:
+
+   Perl:
+
+       use Data::Dump 'dump';
+
+       my $default = [];
+       sub append_one {
+           my $listref = $_[0] // $default;
+           push @{ $listref }, 1;
+           return $listref;
+       }
+
+       say dump(append_one());
+       say dump(append_one());
+
+5. Python lists and tuples don't get flattened when you pass them to
 a function; they get passed by reference.
 
    Perl:
@@ -151,7 +183,7 @@ a function; they get passed by reference.
     pass-by-reference semantics if you use square brackets (i.e., lists),
     because then they look more like Perl listrefs. 
 
-5. The converse is not true, however. There often *is* harm in using a
+6. The converse is not true, however. There often *is* harm in using a
 tuple instead of a list. That's because tuples are immutable; you
 can't append to them, for instance. But they look confusingly similar.
 Again:
@@ -171,7 +203,7 @@ a long way down the road (and at runtime, of course).
 
 This is a second good argument for just using [lists] everywhere.
 
-6. In Python, join() is a method on the string class, not the list class.
+7. In Python, join() is a method on the string class, not the list class.
 This is counterintuitive to most programmers. After all, the list is
 the thing you're joining, right? Why isn't the "verb" on the list "noun?"
 
@@ -206,13 +238,18 @@ the thing you're joining, right? Why isn't the "verb" on the list "noun?"
 
    Here, "\n" is the first noun, and seq is the second noun.
 
-7. Portability: Perl provides its own implementation of certain Unix
+8. Portability: Perl provides its own implementation of certain Unix
 system calls. Python doesn't do this; its 'os' standard library
 makes direct system calls instead.
 
 This means that any time you want to make a direct system call like
 os.tmpnam() or os.urandom, you have to consider the same kind of
 portability gotchas as you would when writing C.
+
+See Also
+--------
+
+http://www.toptal.com/python/top-10-mistakes-that-python-programmers-make?utm_source=Engineering+Blog+Subscribers&utm_campaign=51aba2b5ff-Blog_Post_Email_Top10PythonMistakes&utm_medium=email&utm_term=0_af8c2cde60-51aba2b5ff-109835873
 
 License for This File
 ---------------------
